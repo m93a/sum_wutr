@@ -8,6 +8,7 @@
 #define PI 3.1415926535f
 #define PI2 6.283185307f
 #define POLYG_N 16
+#define PARTICLES 2
 using namespace std;
 
 
@@ -119,14 +120,14 @@ class Vector {
   };
   float dir(Vector v){
    return atan(
-    fabs(this->y - v.y)/
-    fabs(this->x - v.x)
+    (this->y - v.y)/
+    (this->x - v.x)
    );
   };
   float dir(Vector* v){
    return atan(
-    fabs(this->y - v->y)/
-    fabs(this->x - v->x)
+    (this->y - v->y)/
+    (this->x - v->x)
    );
   };
   float abs(){
@@ -248,30 +249,36 @@ class Particle {
 /* * * * * * *
  * main.cpp  *
  * * * * * * */
-Particle* particles [5];
+Particle* particles [PARTICLES]; //Party!
 
 void display(){
- glClearColor(0,0,0,1); //Černá
+ glClearColor(0,0,0,1);
  glClear(GL_COLOR_BUFFER_BIT);
  
- int i = 0;
- int j = 0;
+ int i = 0,
+     j = 0;
+ float s = .0f,
+       a = .0f;
+ Vector vi = *(particles[0]->coord),
+        vj = *(particles[0]->coord);
  do{
+  j = 0;
   do{
    if(i!=j){
-    particles[i]->applyForce(
-     new VectorAngle(
-      particles[i]->coord->dist(particles[j]->coord),
-      particles[i]->coord-> dir(particles[j]->coord)
-     )
-    );
+    vi = *(particles[i]->coord);
+    vj = *(particles[j]->coord);
+    s = vi.dist(vj)/3000;
+    a = vi.dir (vj);
+    particles[i]->applyForce(new VectorAngle(s,a));
    }
   }while(
-   ++j<sizeof(particles)
+   ++j<PARTICLES
   );
+  particles[i]->done();
  }while(
-  ++i<sizeof(particles)
+  ++i<PARTICLES
  );
+ 
  
  glFlush(); //Render now
 }
@@ -282,18 +289,29 @@ void timer(int value){
 }
 
 int main(int argc, char** argv){
+ srand(time(0)); //Ať je sranda
  int i = 0;
  do{
   particles[i] = new Particle(
-   new Vector(rand()%100/100.0f-0.5f,rand()%100/100.0f-0.5f),
+   new Vector(2.0f*rand()/RAND_MAX-1, 2.0f*rand()/RAND_MAX-1),
    1, 0.1f, new Color(1,0,0)
   );
  }while(
-  ++i<sizeof(particles)
+  ++i<PARTICLES
  );
+ 
+ cout<<"\n"+
+  to_string(
+   VectorAngle(1,Vector(0,0).dir(Vector(1,1))/PI).x
+  )
+  +"\n";
+ cout<<"\n"+
+  to_string(
+   VectorAngle(1,Vector(0,0).dir(Vector(1,1))/PI).y
+  )
+  +"\n";
  glutInit(&argc, argv);
- glutCreateWindow("Use the force, Luke");
- glutInitWindowSize(640,640);
+ glutCreateWindow("title");
  glutInitWindowPosition(50,50);
  glutDisplayFunc(display);
  glutTimerFunc(15,timer,0);
