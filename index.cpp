@@ -1,19 +1,25 @@
 #include <iostream>
 #include <string>
 #include <stdlib.h>
-#include <math.h>
+#include <cmath>
 #include <GL/glut.h>
 //#include <windows.h>  //pro wokna
 #include <X11/Xlib.h> //pro X11
 #define PI 3.1415926535f
 #define PI2 6.283185307f
 #define POLYG_N 16
+#define PARTICLES 5
 using namespace std;
 
 
 /* * * * * * * *
  * helpers.cpp *
  * * * * * * * */
+int    pow2(int x   ){return x*x;   }
+float  pow2(float x ){return x*x;   }
+double pow2(double x){return x*x;   }
+int    mattf0(bool x){return x?1:0; }
+int    mattf1(bool x){return x?1:-1;}
 void polygon(
  int n,
  float x,
@@ -65,35 +71,63 @@ class Vector {
   Vector(float x, float y){
    this->x = x;
    this->y = y;
-  }
+  };
   Vector times(float s){
    this->x *= s;
    this->y *= s;
    return *this;
-  }
+  };
   Vector times(Vector v){
    this->x *= v.x;
    this->y *= v.y;
    return *this;
-  }
+  };
   Vector times(Vector* v){
-   this->x *= v->x;
-   this->y *= v->y;
-   return *this;
-  }
+   return this->times(*v);
+  };
   Vector add(Vector v){
    this->x += v.x;
    this->y += v.y;
    return *this;
-  }
+  };
   Vector add(Vector* v){
-   this->x += v->x;
-   this->y += v->y;
-   return *this;
-  }
-  Vector* clone(){
-   return new Vector(this->x, this->y);
-  }
+   return this->add(*v);
+  };
+  Vector clone(){
+   return Vector(this->x, this->y);
+  };
+  float dist(Vector v){
+   return sqrt(
+    pow2(
+     fabs(this->x - v.x)
+    )+
+    pow2(
+     fabs(this->y - v.y)
+    )
+   );
+  };
+  float dist(Vector* v){
+   return this->dist(*v);
+  };
+  float dir(Vector v){
+   return v.y - this->y >= 0
+    ? acos((v.x - this->x) / this->dist(v))
+    :-acos((v.x - this->x) / this->dist(v))+PI2;
+  };
+  float dir(Vector* v){
+   return this->dir(*v);
+  };
+  float abs(){
+   return sqrt(
+    pow2(this->x)+
+    pow2(this->y)
+   );
+  };
+  float angle(){
+   return this->y >= 0
+    ? acos(this->x / this->abs())
+    :-acos(this->x / this->abs())+PI2;
+  };
 };
 class VectorAngle: public Vector {
  public:
@@ -109,7 +143,7 @@ class Color {
   float G;
   float B;
   float A;
-  Color(float R, float G, float B, float A = .0f)
+  Color(float R, float G, float B, float A = 1.0f)
   {
    this->R = R;
    this->G = G;
@@ -176,7 +210,7 @@ class Particle {
     this->force->add(v);
    }
    void applyForce(Vector* v){
-    this->force->add(v);
+    this->applyForce(*v);
    };
    void move(){
     this->speed->add(
@@ -191,6 +225,7 @@ class Particle {
     forceReaction();
     move();
     draw();
+    //play(http://youtu.be/GBHPowULV7k);
    }
    void setColor(Color* color){
     this->color = color;
@@ -200,14 +235,34 @@ class Particle {
 /* * * * * * *
  * main.cpp  *
  * * * * * * */
-Particle* p1 = new Particle(new Vector(-.5f,0),1,.5f,new Color(1,0,0));
+Particle* particles [PARTICLES]; //Party!
 
 void display(){
- glClearColor(0,0,0,1); //Černá
+ glClearColor(0,0,0,1);
  glClear(GL_COLOR_BUFFER_BIT);
  
- p1->applyForce(new Vector(0.001f,0));
- p1->done();
+ int i = 0,
+     j = 0;
+ float s = .0f,
+       a = .0f;
+ Vector vi = *(particles[0]->coord),
+        vj = *(particles[0]->coord);
+ for(i=0;i<PARTICLES;i++){
+  for(j=0;j<PARTICLES;j++){
+   if(i!=j){
+    vi = *(particles[i]->coord);
+    vj = *(particles[j]->coord);
+    s = vi.dist(vj)/3000;
+    a = vi.dir (vj);
+    particles[i]->applyForce(new VectorAngle(s,a));
+   }
+  }
+ }
+ 
+ for(i=0;i<PARTICLES;i++){
+  particles[i]->done();
+ }
+ 
  
  glFlush(); //Render now
 }
@@ -217,10 +272,18 @@ void timer(int value){
  glutTimerFunc(15,timer,0);
 }
 
-int main(int argc, char** argv){ 
+int main(int argc, char** argv){
+ srand(time(0)); //Ať je sranda
+ int i;
+ for(i=0;i<PARTICLES;i++){
+  particles[i] = new Particle(
+   new Vector(2.0f*rand()/RAND_MAX-1, 2.0f*rand()/RAND_MAX-1),
+   1, 0.1f, new Color(1,0,0)
+  );
+ }
+ 
  glutInit(&argc, argv);
- glutCreateWindow("Use the force, Luke");
- glutInitWindowSize(640,640);
+ glutCreateWindow("title");
  glutInitWindowPosition(50,50);
  glutDisplayFunc(display);
  glutTimerFunc(15,timer,0);
