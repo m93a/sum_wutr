@@ -5,21 +5,29 @@
 #include <GL/glut.h>
 //#include <windows.h>  //pro wokna
 #include <X11/Xlib.h> //pro X11
-#define PI 3.1415926535f
+
+#define PI 3.141592654f
 #define PI2 6.283185307f
-#define POLYG_N 16
-#define PARTICLES 5
+#define EUL 2.718281829f
+
+#define RIGHT 0.0f
+#define UP   1.570796327f
+#define LEFT 3.141592654f
+#define DOWN 4.712388980f
+
+#define POLYG_N 4
+#define PARTICLES 256
+#define FRICTION 0.1f
+#define SPEED 1.0f
 using namespace std;
 
 
 /* * * * * * * *
  * helpers.cpp *
  * * * * * * * */
-int    pow2(int x   ){return x*x;   }
-float  pow2(float x ){return x*x;   }
-double pow2(double x){return x*x;   }
-int    mattf0(bool x){return x?1:0; }
-int    mattf1(bool x){return x?1:-1;}
+int    pow2(int x   ){return x*x;}
+float  pow2(float x ){return x*x;}
+double pow2(double x){return x*x;}
 void polygon(
  int n,
  float x,
@@ -82,16 +90,10 @@ class Vector {
    this->y *= v.y;
    return *this;
   };
-  Vector times(Vector* v){
-   return this->times(*v);
-  };
   Vector add(Vector v){
    this->x += v.x;
    this->y += v.y;
    return *this;
-  };
-  Vector add(Vector* v){
-   return this->add(*v);
   };
   Vector clone(){
    return Vector(this->x, this->y);
@@ -128,6 +130,12 @@ class Vector {
     ? acos(this->x / this->abs())
     :-acos(this->x / this->abs())+PI2;
   };
+  Vector times(Vector* v){
+   return this->times(*v);
+  };
+  Vector add(Vector* v){
+   return this->add(*v);
+  };
 };
 class VectorAngle: public Vector {
  public:
@@ -163,15 +171,17 @@ class Particle {
    Vector* force;
    Color* color;
    float radius;
-   float invmass;
-   Particle(Vector* coord, float invmass, float radius, Color* color)
+   float mass;
+   bool render;
+   Particle(Vector* coord, float mass, float radius, Color* color)
    {
-    this->speed = new Vector(0,0);
-    this->force = new Vector(0,0);
-    this->coord   = coord;
-    this->radius  = radius;
-    this->invmass = invmass;
-    this->color   = color;
+    this->render = true;
+    this->speed  = new Vector(0,0);
+    this->force  = new Vector(0,0);
+    this->coord  = coord;
+    this->radius = radius;
+    this->mass   = mass;
+    this->color  = color;
    };
    ~Particle(){
     delete this->coord;
@@ -180,6 +190,7 @@ class Particle {
     delete this->color;
    };
    void draw(){
+    if(!this->render){return;}
     changeColor(this->color);
     polygonAlpha(
      POLYG_N,
@@ -189,22 +200,26 @@ class Particle {
     );
    };
    void forceReaction(){
-    /* Not exacty the right way FIXME */
-    this->speed->x =
-     this->coord->x + this->radius*3/5 > 1 ?
-      -fabs(this->speed->x):
-     this->coord->x - this->radius*3/5 < -1 ?
-      fabs(this->speed->x):
-     //:
-      this->speed->x;
-    
-    this->speed->y =
-     this->coord->y + this->radius*3/5 > 1 ?
-      -fabs(this->speed->y):
-     this->coord->y - this->radius*3/5 < -1 ?
-      fabs(this->speed->y):
-     //:
-      this->speed->y;
+    if(
+     fabs(this->coord->x) + this->radius > 1
+    ){
+     this->applyForceVa(
+      pow(fabs(this->coord->x) + this->radius - 1,2),
+      this->coord->x > 0
+       ? LEFT
+       : RIGHT
+     );
+    }
+    if(
+     fabs(this->coord->y) + this->radius > 1
+    ){
+     this->applyForceVa(
+      pow(fabs(this->coord->y) + this->radius - 1,2),
+      this->coord->y > 0
+       ? DOWN
+       : UP
+     );
+    }
    };
    void applyForce(Vector v){
     this->force->add(v);
@@ -212,14 +227,27 @@ class Particle {
    void applyForce(Vector* v){
     this->applyForce(*v);
    };
+   void applyForceV(float x, float y){
+    this->applyForce(Vector(x,y));
+   };
+   void applyForceVa(float s, float a){
+    this->applyForce(VectorAngle(s,a));
+   };
    void move(){
     this->speed->add(
-     this->force->times(invmass)
+     this->force->times(SPEED/mass)
     );
     delete this->force;
     this->force = new Vector(0,0);
     
     this->coord->add(this->speed);
+    
+    this->speed->x -= this->speed->x * FRICTION;
+    this->speed->y -= this->speed->y * FRICTION;
+    
+    if(this->speed->abs() > 1){
+     this->speed = new VectorAngle(1,this->speed->angle());
+    }
    };
    void done(){
     forceReaction();
@@ -243,21 +271,23 @@ void display(){
  
  int i = 0,
      j = 0;
- float s = .0f,
-       a = .0f;
- Vector vi = *(particles[0]->coord),
-        vj = *(particles[0]->coord);
+ float x = .0f,
+       maxSpeed = .0f;
  for(i=0;i<PARTICLES;i++){
   for(j=0;j<PARTICLES;j++){
    if(i!=j){
-    vi = *(particles[i]->coord);
-    vj = *(particles[j]->coord);
-    s = vi.dist(vj)/3000;
-    a = vi.dir (vj);
-    particles[i]->applyForce(new VectorAngle(s,a));
+    x = particles[i]->coord->dist(particles[j]->coord);
+    particles[i]->applyForce(new VectorAngle(
+     -pow(1/(400*x),2),
+     particles[i]->coord->dir (particles[j]->coord)
+    ));
    }
   }
+  particles[i]->applyForceVa(0.001f,DOWN);
+  maxSpeed = particles[i]->speed->x > maxSpeed ? particles[i]->speed->x : maxSpeed;
+  maxSpeed = particles[i]->speed->y > maxSpeed ? particles[i]->speed->y : maxSpeed;
  }
+ cout<<to_string(maxSpeed)+"\n";
  
  for(i=0;i<PARTICLES;i++){
   particles[i]->done();
@@ -277,14 +307,14 @@ int main(int argc, char** argv){
  int i;
  for(i=0;i<PARTICLES;i++){
   particles[i] = new Particle(
-   new Vector(2.0f*rand()/RAND_MAX-1, 2.0f*rand()/RAND_MAX-1),
-   1, 0.1f, new Color(1,0,0)
+   new Vector(1.0f*rand()/RAND_MAX-0.5f, 1.0f*rand()/RAND_MAX-0.5f),
+   1, 0.05f, new Color(1,0,0)
   );
  }
  
  glutInit(&argc, argv);
+ glutInitWindowSize(800,800);
  glutCreateWindow("title");
- glutInitWindowPosition(50,50);
  glutDisplayFunc(display);
  glutTimerFunc(15,timer,0);
  glutMainLoop();
