@@ -19,6 +19,7 @@
 #define PARTICLES 256
 #define FRICTION 0.1f
 #define SPEED 1.0f
+#define MSPF 15
 using namespace std;
 
 
@@ -244,15 +245,20 @@ class Particle {
     
     this->speed->x -= this->speed->x * FRICTION;
     this->speed->y -= this->speed->y * FRICTION;
-    
+   };
+   void limit(){
     if(this->speed->abs() > 1){
      this->speed = new VectorAngle(1,this->speed->angle());
     }
-   };
+    if(this->coord->abs() > 100){
+     this->coord = new VectorAngle(1,this->coord->angle());
+    }
+   }
    void done(){
     forceReaction();
     move();
     draw();
+    limit();
     //play(http://youtu.be/GBHPowULV7k);
    }
    void setColor(Color* color){
@@ -271,23 +277,21 @@ void display(){
  
  int i = 0,
      j = 0;
- float x = .0f,
-       maxSpeed = .0f;
+ float x = .0f;
  for(i=0;i<PARTICLES;i++){
   for(j=0;j<PARTICLES;j++){
    if(i!=j){
     x = particles[i]->coord->dist(particles[j]->coord);
-    particles[i]->applyForce(new VectorAngle(
-     -pow(1/(400*x),2),
-     particles[i]->coord->dir (particles[j]->coord)
-    ));
+    if(x!=0){
+     particles[i]->applyForce(new VectorAngle(
+      -pow(1/(400*x),2),
+      particles[i]->coord->dir (particles[j]->coord)
+     ));
+    }
    }
   }
   particles[i]->applyForceVa(0.001f,DOWN);
-  maxSpeed = particles[i]->speed->x > maxSpeed ? particles[i]->speed->x : maxSpeed;
-  maxSpeed = particles[i]->speed->y > maxSpeed ? particles[i]->speed->y : maxSpeed;
  }
- cout<<to_string(maxSpeed)+"\n";
  
  for(i=0;i<PARTICLES;i++){
   particles[i]->done();
@@ -299,7 +303,7 @@ void display(){
 
 void timer(int value){
  glutPostRedisplay();
- glutTimerFunc(15,timer,0);
+ glutTimerFunc(MSPF,timer,0);
 }
 
 int main(int argc, char** argv){
@@ -316,7 +320,7 @@ int main(int argc, char** argv){
  glutInitWindowSize(800,800);
  glutCreateWindow("title");
  glutDisplayFunc(display);
- glutTimerFunc(15,timer,0);
+ glutTimerFunc(MSPF,timer,0);
  glutMainLoop();
  return 0;
 }
