@@ -8,7 +8,7 @@ CPPFLAGS = -std=c++0x
 LOADLIBES = -lGL -lGLU -lglut
 
 target = main
-objects = main.o math.o vector.o gl.o particle.o crystal.o crystal_bond.o
+objects = main.o math.o vector.o gl.o particle.o
 
 default: $(target)
 
